@@ -1,0 +1,99 @@
+﻿@page
+<div class="container">
+    <div class="row">&nbsp;</div>
+    <div class="row">
+        <div class="col-6">
+            <input type="button" id="joinGroup" value="Group" alt="Join to a private group" />            
+        </div>
+        <div class="col-6">
+            User..........<input type="text" id="userInput" />
+            <br />
+            Message...<input type="text" id="messageInput" />
+            <select id="group">
+                <option value="All">All</option>
+                <option value="Myself">Me</option>
+                <option value="PrivateGroup">Group [Just One - Private Group]</option>
+            </select>
+            <input type="button" id="sendButton" value="Send" />
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-12">
+            <ul id="messagesList"></ul>
+        </div>
+    </div>
+</div>
+<script src="~/js/signalr.js"></script>
+<script>
+    "use strict";
+
+    var connection = new signalR.HubConnectionBuilder().withUrl("/chatHub").build();
+   
+    connection.on("ReceiveMessage", function (message) {
+        var msg = message.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        var div = document.createElement("div");
+        div.innerHTML = msg + "<hr/>";
+        document.getElementById("messagesList").appendChild(div);
+    });
+
+
+    //Usuarios
+    connection.on("UserConnected", function (connectionId) {
+        var groupElement = document.getElementById("group");
+        var option = document.createElement("option");
+        option.text = connectionId;
+        option.value = connectionId;
+        groupElement.add(option);
+    });
+
+    connection.on("UserDisconnected", function (connectionId) {
+        var groupElement = document.getElementById("group");
+        for (var i = 0; i < groupElement.length; i++) {
+            if (groupElement.options[i].value == connectionId) {
+                groupElement.remove(i);
+            }
+        }
+    });
+    //Usuarios
+
+    connection.start().catch(function (err) {
+        return console.error(err.toString());
+    });
+
+    //Eventos
+    document.getElementById("sendButton").addEventListener("click", function (event) {        
+        var user = document.getElementById("userInput").value;
+        var message = document.getElementById("messageInput").value;
+        var groupElement = document.getElementById("group");
+        var groupValue = groupElement.options[groupElement.selectedIndex].value;
+
+        
+        if (groupValue === "All" || groupValue === "Myself") {
+            var method = groupValue === "All" ? "SendMessageToAll" : "SendMessageToCaller";
+
+            console.log('a' + method);
+            console.log('b' + message);
+            connection.invoke(method, message).catch(function (err) {
+                return console.error(err.toString());
+            });
+        } else if (groupValue === "PrivateGroup") {
+            connection.invoke("SendMessageToGroup", "PrivateGroup", message).catch(function (err) {
+                return console.error(err.toString());
+            });
+        } else {
+            connection.invoke("SendMessageToUser", groupValue, message).catch(function (err) {
+                return console.error(err.toString());
+            });
+        }       
+        event.preventDefault();
+    });
+
+    document.getElementById("joinGroup").addEventListener("click", function (event) {
+        connection.invoke("JoinGroup", "PrivateGroup").catch(function (err) {
+            return console.error(err.toString());
+        });
+        event.preventDefault();
+    });
+    //Eventos
+
+</script>
